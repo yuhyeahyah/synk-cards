@@ -216,5 +216,5 @@ module.exports = {
     getUserCardsCount,
     getUser,
     deleteCard,
-     getUserDataForProfile
+    getUserDataForProfile
 };
