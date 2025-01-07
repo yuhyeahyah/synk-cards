@@ -1,8 +1,17 @@
 const TelegramBot = require('node-telegram-bot-api');
-const { TOKEN, WEBHOOK_URL, PORT } = require('./config.js');
-const { createTables, addCard, getCard, listCards, addUser, addCardToUser, getUserCards, getUserCardsCount, getUser, deleteCard, getUserDataForProfile } = require('./database.js');
+const { TOKEN, WEBHOOK_URL, PORT, ADMIN_ID } = require('./config.js');
+const { createTables} = require('./database.js');
 const express = require('express')
 const bodyParser = require('body-parser');
+const startCommand = require('./commands/start.js');
+const addcardCommand = require('./commands/addcard.js');
+const getcardCommand = require('./commands/getcard.js');
+const cardsCommand = require('./commands/cards.js');
+const givecardCommand = require('./commands/givecard.js');
+const mycardsCommand = require('./commands/mycards.js');
+const delcardCommand = require('./commands/delcard.js');
+const perfilCommand = require('./commands/perfil.js');
+const drawCommand = require('./commands/draw.js');
 
 const app = express()
 app.use(bodyParser.json());
@@ -18,81 +27,28 @@ const handleCommand = async (text, telegram_id) => {
     const command = parts[0].toLowerCase();
     const args = parts.slice(1);
 
-    if (command === "/start") {
-        const user_id = await addUser(telegram_id);
-        if (user_id) return "Olá! Vamos colecionar cartas juntos!";
-        return "Bem vindo(a) de volta!";
-    } else if (command === "/addcard") {
-        if (args.length < 4) {
-            return "Uso: /addcard <nome> <categoria> <raridade> <mensagem com imagem>";
-        }
-        const name = args[0];
-        const category = args[1];
-        const rarity = args[2];
-        const image_id = args[3];
-        const card_id = await addCard(name, category, rarity, image_id);
-        return `Carta '${name}' adicionada com ID: ${card_id}.`;
-    } else if (command === "/getcard") {
-        if (args.length < 1) {
-            return "Uso: /getcard <ID_DA_CARTA>";
-        }
-        const card_id = args[0];
-       const card = await getCard(card_id)
-       if (card) {
-          return `ID: ${card.id}\nNome: ${card.name}\nCategoria: ${card.category}\nRaridade: ${card.rarity}\nID da Imagem: ${card.image_id}`;
-        }
-        return "Carta não encontrada.";
-    } else if (command === "/cards") {
-        const cards = await listCards();
-        if (cards) {
-            return cards.map(card => `ID: ${card.id}\nNome: ${card.name}\nCategoria: ${card.category}\nRaridade: ${card.rarity}\nID da Imagem: ${card.image_id}\n---`).join('\n');
-          }
-          return "Nenhuma carta encontrada."
-    } else if (command === "/givecard") {
-        if (args.length < 2) {
-            return "Uso: /givecard <ID_DO_USUÁRIO> <ID_DA_CARTA>";
-        }
-        const user_id = args[0];
-        const card_id = args[1];
-        await addCardToUser(user_id, card_id);
-        return `Carta ${card_id} adicionada ao inventário do usuário ${user_id}.`;
-    } else if (command === "/mycards") {
-        const user_id = await getUser(telegram_id)
-        if (!user_id) {
-          return "Você precisa iniciar a bot com /start"
-        }
-
-        const user_cards = await getUserCards(user_id.id);
-        if (user_cards) {
-          const text = `Você tem ${await getUserCardsCount(user_id.id)} cartas em sua coleção.\n\n` + user_cards.map(card => `ID: ${card.id}\nNome: ${card.name}\nCategoria: ${card.category}\nRaridade: ${card.rarity}\n---`).join('\n')
-          return text
-        }
-          return "Você não possui nenhuma carta."
-    }else if (command === "/delcard") {
-         if (args.length < 1) {
-            return "Uso: /delcard <ID_DA_CARTA>";
-        }
-        const card_id = args[0];
-        const card = await getCard(card_id)
-        if (card) {
-            await deleteCard(card_id);
-            return `Carta '${card.name}' deletada com ID: ${card.id}.`;
-        }
-         return "Carta não encontrada."
-    } else if(command === "/perfil") {
-          const user = await getUserDataForProfile(telegram_id)
-          if (!user) {
-              return "Você precisa iniciar a bot com /start"
-          }
-          return `
-    Perfil 
-    ID: ${user.user_id}
-    Moedas: ${user.coins}
-    Cartas: ${user.card_count}
-`;
-    } else {
-        return "Comando inválido.";
-    }
+  switch (command) {
+    case "/start":
+      return await startCommand(telegram_id)
+     case "/addcard":
+      return await addcardCommand(text, telegram_id)
+    case "/getcard":
+        return await getcardCommand(text)
+    case "/cards":
+        return await cardsCommand()
+    case "/givecard":
+      return await givecardCommand(text)
+    case "/mycards":
+      return await mycardsCommand(telegram_id)
+    case "/delcard":
+         return await delcardCommand(text);
+    case "/perfil":
+         return await perfilCommand(telegram_id);
+    case "/girar":
+      return await drawCommand(telegram_id)
+      default:
+      return "Comando inválido.";
+  }
 };
 
 const handlePhoto = async(file_id, telegram_id) => {
@@ -143,6 +99,7 @@ const handleMessage = async (data) => {
 app.get('/status', async (_, res) => {
   res.status(200).send('ok')
 })
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Webhook server started on port ${PORT}`)
   console.log(`Please, set this webhook on telegram: ${WEBHOOK_URL}`)
